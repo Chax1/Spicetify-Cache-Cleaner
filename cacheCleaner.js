@@ -7,7 +7,7 @@
         Spicetify.Platform.OfflineAPI._storage = Spicetify.Platform.Offline._storageService;
     }
     if (!Spicetify.Platform?.OfflineAPI?._storage?.getStats || !Spicetify.Platform?.OfflineAPI?._storage?.deleteUnlockedItems) {
-        setTimeout(cacheCleaner, 500);
+        setTimeout(cacheCleaner,  500);
         return;
     }
 
@@ -23,13 +23,18 @@
     const react = Spicetify.React;
     const { useState, useEffect, useCallback } = react;
     // Date enum in milliseconds
-    const time = { launch: 0, daily: 24 * 60 * 60 * 1000, weekly: 24 * 60 * 60 * 1000 * 7, monthly: 30 * 24 * 60 * 60 * 1000 };
+    const time = {
+        launch:   0,
+        everyTenSecs:   10 *   1000, //   10 seconds in milliseconds
+        weekly:   24 *   60 *   60 *   1000 *   7,
+        monthly:   30 *   24 *   60 *   60 *   1000
+    };
 
     config.enabled = config.enabled ?? true;
     config.notify = config.notify ?? true;
     config.frequency = config.frequency ?? "weekly";
     config.time = config.time ?? Date.now() + time[config.frequency];
-    config.threshold = config.threshold ?? 0;
+    config.threshold = config.threshold ??  0;
     localStorage.setItem("spicetify-cache-cleaner:config", JSON.stringify(config));
 
     async function clearCache(purge = false) {
@@ -38,9 +43,9 @@
 
         async function showNotification() {
             await Spicetify.Platform.OfflineAPI._storage.getStats().then((stats) => {
-                if (cacheCleaned - Number(stats.currentSize) <= 0 && purge) {
+                if (cacheCleaned - Number(stats.currentSize) <=  0 && purge) {
                     // Double check if size has been reduced
-                    setTimeout(() => clearCache(purge), 500);
+                    setTimeout(() => clearCache(purge),  500);
                     return;
                 }
                 cacheCleaned = cacheCleaned - Number(stats.currentSize);
@@ -375,6 +380,7 @@
                         options: {
                             never: "Never",
                             launch: "On launch",
+                            everyTenSecs: "Every ten seconds", // New   10-second option
                             daily: "After a day",
                             weekly: "After a week",
                             monthly: "After a month",
@@ -413,23 +419,26 @@
 
     new Spicetify.Menu.Item("Cache config", false, openModal).register();
 
-    if (config.enabled) {
+    async function checkAndClearCache() {
         const stats = await Spicetify.Platform.OfflineAPI._storage.getStats();
         const threshold = Number(config.threshold);
-
+    
         if (isNaN(threshold)) {
             Spicetify.showNotification("Invalid threshold value, please enter a number");
-            config.threshold = 0;
+            config.threshold =   0;
             localStorage.setItem("spicetify-cache-cleaner:config", JSON.stringify(config));
         }
-
+    
         // Prioritize clearing cache if it's above threshold
-        if (!isNaN(threshold) && threshold > 0 && Number(stats.currentSize) > threshold) {
+        if (!isNaN(threshold) && threshold >   0 && Number(stats.currentSize) > threshold) {
             await clearCache(true);
-        } else if (config.time > 0 && Date.now() - config.time > 0) {
+        } else if (config.time >   0 && Date.now() - config.time >   0) {
             await clearCache(true);
             config.time = Date.now() + time[config.frequency];
             localStorage.setItem("spicetify-cache-cleaner:config", JSON.stringify(config));
         }
     }
+
+    setInterval(checkAndClearCache,  5 *  60 *  1000);
+
 })();
